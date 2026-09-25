@@ -151,9 +151,12 @@ def handle_group(ev):
 	user_id = db.get("m%d" % ev.reply_to_message.message_id)
 	user = db_get_user(user_id)
 
-	
+	if 'text' in ev.json.keys():
+		user_message = ev.json["text"]
+	else:
+		user_message = "User did not include text in their message."
 
-	logging.info("Moderator [@%s] has replied to [%s | @%s | %s]: %s", ev.from_user.username, user.realname, user.username, user.id, ev.json["text"])
+	logging.info("Moderator [@%s] has replied to [%s | @%s | %s]: %s", ev.from_user.username, user.realname, user.username, user.id, user_message)
 	if user_id is None:
 		logging.warning("Couldn't find replied to message in target group")
 		return
@@ -247,7 +250,13 @@ def handle_private(ev):
 	def f(user_id=user.id):
 		ev2 = bot.forward_message(target_group, ev.chat.id, ev.message_id)
 		db["m%d" % ev2.message_id] = user_id
-		logging.info("Message forwarded from [%s | @%s | %s]: %s", user.realname, user.username, user.id, ev2.json["text"])
+
+		if 'text' in ev2.json.keys():
+			user_message = ev2.json["text"]
+		else:
+			user_message = "User did not include text in their message."
+
+		logging.info("Message forwarded from [%s | @%s | %s]: %s", user.realname, user.username, user.id, user_message)
 	callwrapper(f)
 
 	if reply_text:
