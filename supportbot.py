@@ -1,0 +1,81 @@
+#!/usr/bin/env python3
+import logging
+import yaml
+import threading
+import sys
+import os
+import shelve
+import getopt
+
+import core
+
+def start_new_thread(func, join=False, args=(), kwargs={}):
+    t = threading.Thread(target=func, args=args, kwargs=kwargs)
+    if not join:
+        t.daemon = True
+    t.start()
+    if join:
+        t.join()
+
+def readopt(name):
+    global opts
+    for e in opts:
+        if e[0] == name:
+            return e[1]
+    return None
+
+def usage():
+    print("Usage: %s [-q|-d] [-c config.yaml]" % sys.argv[0])
+    print("Options:")
+    print("  -h    Display this text")
+    print("  -q    Quiet, set log level to WARNING")
+    print("  -c    Location of config file (default: ./config.yaml)")
+
+def open_db(config):
+    try:
+        db = shelve.open(config["database"])
+        logging.info("Database opened successfully.")
+        return db
+    except Exception as e:
+        logging.error(f"Failed to open database: {e}")
+        sys.exit(1)
+
+def main(configpath, loglevel=logging.INFO):
+    with open(configpath, "r") as f:
+        config = yaml.safe_load(f)
+
+    logging.basicConfig(format="%(levelname)-7s [%(asctime)s] %(message)s", datefmt="%Y-%m-%d %H:%M:%S", level=loglevel)
+
+    db = open_db(config)
+
+    core.init(config, db)
+
+    try:
+        start_new_thread(core.run, join=True)
+    except KeyboardInterrupt:
+        logging.info("Interrupted, exiting")
+        db.close()
+        os._exit(1)
+    except Exception as e:
+        logging.error(f"Unhandled exception: {e}")
+        db.close()
+        os._exit(1)
+
+if __name__ == "__main__":
+    try:
+        opts, args = getopt.getopt(sys.argv[1:], "hqc:", ["help"])
+    except getopt.GetoptError as e:
+        print(str(e))
+        exit(1)
+    # Process command line args
+    if readopt("-h") is not None or readopt("--help") is not None:
+        usage()
+        exit(0)
+    loglevel = logging.INFO
+    if readopt("-q") is not None:
+        loglevel = logging.WARNING
+    configpath = "./config.yaml"
+    if readopt("-c") is not None:
+        configpath = readopt("-c")
+    # Run the actual program
+    main(configpath, loglevel)
